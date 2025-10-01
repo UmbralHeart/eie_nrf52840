@@ -1,0 +1,21 @@
+git commit - Creates a commit
+
+git branch - Creates a new branch in the commit
+
+git checkout - Moves the * to the branch you put as the argument
+
+git pull - fetch + merge
+	
+git push - Updates the community repository with your own info
+
+git merge - Merges the existing commits into one commit
+
+git rebase - Creates one parallel commit branch	
+
+git fetch - Fetches updates from the remote repository
+
+git add - adds a file to 'staging area'
+
+git status - prints status of files in staging area 
+
+git log - check where your commit is in the git history tree
