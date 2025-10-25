@@ -24,6 +24,7 @@ int main(void) {
     return 0;
   }
 
+  LED_set(LED0, LED_ON);
   state_machine_init();
 
   while(1) {
