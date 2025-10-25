@@ -10,34 +10,25 @@
 /*-------------------------------------------------------------------
  * Function Prototypes
  *-------------------------------------------------------------------*/
-static void s0_state_entry(void* o);
-static enum smf_state_result s0_state_run(void* o);
-static void s0_state_exit(void* o);
+static void startup_entry(void* o);
+static enum smf_state_result startup_run(void* o);
 
-static void s1_state_entry(void* o);
-static enum smf_state_result s1_state_run(void* o);
-static void s1_state_exit(void* o);
+static enum smf_state_result enter_pw_run(void* o);
 
-static void s2_state_entry(void* o);
-static enum smf_state_result s2_state_run(void* o);
-static void s2_state_exit(void* o);
+static void password_entry(void* o);
+static enum smf_state_result password_run(void* o);
 
-static void s3_state_entry(void* o);
-static enum smf_state_result s3_state_run(void* o);
-static void s3_state_exit(void* o);
+static void locked_entry(void* o);
+static enum smf_state_result locked_run(void* o);
 
-static void s4_state_entry(void* o);
-static enum smf_state_result s4_state_run(void* o);
-static void s4_state_exit(void* o);
 /*-------------------------------------------------------------------
  * Typedefs
  *-------------------------------------------------------------------*/
 enum led_state_machine_states {
-    S0,
-    S1,
-    S2,
-    S3,
-    S4
+    startup,
+    enter_pw,
+    password,
+    locked
 };
 
 typedef struct {
@@ -45,156 +36,146 @@ typedef struct {
     struct smf_ctx ctx;
 
     uint16_t count;
+
+    uint8_t pw_array[4];
+
+    uint8_t try_pw_array[4];
+
+    uint8_t flag;
+
+    uint8_t index;
 } led_state_object_t;
 
 /*-------------------------------------------------------------------
  * Local Variables
  *-------------------------------------------------------------------*/
 static const struct smf_state led_states[] = {
-    [S0] = SMF_CREATE_STATE(s0_state_entry, s0_state_run, s0_state_exit, NULL, NULL),
-    [S1] = SMF_CREATE_STATE(s1_state_entry, s1_state_run, s1_state_exit, NULL, NULL),
-    [S2] = SMF_CREATE_STATE(s2_state_entry, s2_state_run, s2_state_exit, NULL, NULL),
-    [S3] = SMF_CREATE_STATE(s3_state_entry, s3_state_run, s3_state_exit, NULL, NULL),
-    [S4] = SMF_CREATE_STATE(s4_state_entry, s4_state_run, s4_state_exit, NULL, NULL),
+    [startup] = SMF_CREATE_STATE(startup_entry, startup_run, NULL, NULL, NULL),
+    [enter_pw] = SMF_CREATE_STATE(NULL, enter_pw_run, NULL, NULL, NULL),
+    [password] = SMF_CREATE_STATE(password_entry, password_run, NULL, NULL, NULL),
+    [locked] = SMF_CREATE_STATE(locked_entry, locked_run, NULL, NULL, NULL),
 };
 
 static led_state_object_t led_state_object;
 
 void state_machine_init() {
     led_state_object.count = 0;
-    smf_set_initial(SMF_CTX(&led_state_object), &led_states[S0]);
+    led_state_object.flag = 0;
+    led_state_object.pw_array[0] = 0;
+    led_state_object.pw_array[1] = 0;
+    led_state_object.pw_array[2] = 0;
+    led_state_object.pw_array[3] = 0;
+    led_state_object.try_pw_array[0] = 0;
+    led_state_object.try_pw_array[1] = 0;
+    led_state_object.try_pw_array[2] = 0;
+    led_state_object.try_pw_array[3] = 0;
+    led_state_object.index = 0;
+    smf_set_initial(SMF_CTX(&led_state_object), &led_states[startup]);
 }
 
 int state_machine_run() {
     return smf_run_state(SMF_CTX(&led_state_object));
 }
 
-static void s0_state_entry(void* o) {
-    LED_set(LED0, LED_OFF);
-    LED_set(LED1, LED_OFF);
-    LED_set(LED2, LED_OFF);
-    LED_set(LED3, LED_OFF);
-    printk("Entering S0\n");
+static void startup_entry(void* o) {
+    LED_set(LED3, LED_ON);
 }
 
-static enum smf_state_result s0_state_run(void* o) {
-    if (BTN_check_clear_pressed(BTN0)) {
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[S1]);
+static enum smf_state_result startup_run(void* o) {
+    if (BTN_check_clear_pressed(BTN3)) {
+        smf_set_state(SMF_CTX(&led_state_object), &led_states[enter_pw]);
     }
+    else if (led_state_object.count > 3000) {
+        led_state_object.count = 0;
+        smf_set_state(SMF_CTX(&led_state_object), &led_states[password]);
+    }
+    else
+        led_state_object.count++;
         
     return SMF_EVENT_HANDLED;
 }
 
-  static void s0_state_exit(void* o) {
-    printk("Exiting S0\n");
-}
-
-  static void s1_state_entry(void* o) {
-    LED_set(LED0, LED_ON);
-    printk("Entering S1\n");
-}
-
-static enum smf_state_result s1_state_run(void* o) {
-    if (BTN_check_clear_pressed(BTN1)) {
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[S2]);
+static enum smf_state_result enter_pw_run(void* o) {
+    if (BTN_check_clear_pressed(BTN0) && led_state_object.flag != 1) {
+        led_state_object.pw_array[led_state_object.index] = 1;
+        led_state_object.index++;
     }
-    else if (BTN_check_clear_pressed(BTN2)) {
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[S4]);
+    else if (BTN_check_clear_pressed(BTN1) && led_state_object.flag != 1) {
+        led_state_object.pw_array[led_state_object.index] = 2;
+        led_state_object.index++;
+    }
+    else if (BTN_check_clear_pressed(BTN2) && led_state_object.flag != 1) {
+        led_state_object.pw_array[led_state_object.index] = 3;
+        led_state_object.index++;
     }
     else if (BTN_check_clear_pressed(BTN3)) {
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[S0]);
+        printk("%d %d %d %d\n", led_state_object.pw_array[0], led_state_object.pw_array[1], led_state_object.pw_array[2], led_state_object.pw_array[3]);
+        smf_set_state(SMF_CTX(&led_state_object), &led_states[locked]);
     }
-    else if (led_state_object.count > 250) {
-        led_state_object.count = 0;
-        LED_toggle(LED0);
+
+    if (led_state_object.index >= 4) {
+        led_state_object.flag = 1;
     }
-    else
-        led_state_object.count++;
 
     return SMF_EVENT_HANDLED;
 }
 
-static void s1_state_exit(void* o) {
-    printk("Exiting S1\n");
+static void locked_entry(void* o) {
+    LED_set(LED0, LED_OFF);
+    LED_set(LED1, LED_OFF);
+    LED_set(LED2, LED_OFF);
+    LED_set(LED3, LED_OFF);
 }
 
-static void s2_state_entry(void* o) {
+static enum smf_state_result locked_run(void* o) {
+    if (BTN_check_clear_pressed(BTN0) ||
+        BTN_check_clear_pressed(BTN1) ||
+        BTN_check_clear_pressed(BTN2) ||
+        BTN_check_clear_pressed(BTN3)) {
+        smf_set_state(SMF_CTX(&led_state_object), &led_states[password]);
+    }
+
+    return SMF_EVENT_HANDLED;
+}
+static void password_entry(void* o) {
     LED_set(LED0, LED_ON);
     LED_set(LED1, LED_OFF);
-    LED_set(LED2, LED_ON);
-    LED_set(LED3, LED_OFF);
-    printk("Entering S2\n");
-}
-
-static enum smf_state_result s2_state_run(void* o) {
-    if (BTN_check_clear_pressed(BTN3)) {
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[S0]);
-    }
-    else if (led_state_object.count > 1000) {
-        led_state_object.count = 0;
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[S3]);
-    }
-    else
-        led_state_object.count++;
-
-    return SMF_EVENT_HANDLED;
-}
-
-static void s2_state_exit(void* o) {
-    printk("Exiting S2\n");
-}
-
-static void s3_state_entry(void* o) {
-    LED_set(LED0, LED_OFF);
-    LED_set(LED1, LED_ON);
     LED_set(LED2, LED_OFF);
-    LED_set(LED3, LED_ON);
-    printk("Entering S3\n");
+    LED_set(LED3, LED_OFF);
+    led_state_object.index = 0;
 }
 
-static enum smf_state_result s3_state_run(void* o) {
-    if (BTN_check_clear_pressed(BTN3)) {
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[S0]);
+static enum smf_state_result password_run(void* o) {
+    if (BTN_check_clear_pressed(BTN0) && led_state_object.flag != 1) {
+        led_state_object.try_pw_array[led_state_object.index] = 1;
+        led_state_object.index++;
     }
-    else if (led_state_object.count > 2000) {
-        led_state_object.count = 0;
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[S2]);
+    else if (BTN_check_clear_pressed(BTN1) && led_state_object.flag != 1) {
+        led_state_object.try_pw_array[led_state_object.index] = 2;
+        led_state_object.index++;
     }
-    else
-        led_state_object.count++;
+    else if (BTN_check_clear_pressed(BTN2) && led_state_object.flag != 1) {
+        led_state_object.try_pw_array[led_state_object.index] = 3;
+        led_state_object.index++;
+    }
+    else if (BTN_check_clear_pressed(BTN3)) {
+        printk("%d %d %d %d\n", led_state_object.try_pw_array[0], led_state_object.try_pw_array[1], led_state_object.try_pw_array[2], led_state_object.try_pw_array[3]);
+        if (led_state_object.try_pw_array[0] == led_state_object.pw_array[0] &&
+            led_state_object.try_pw_array[1] == led_state_object.pw_array[1] &&
+            led_state_object.try_pw_array[2] == led_state_object.pw_array[2] &&
+            led_state_object.try_pw_array[3] == led_state_object.pw_array[3] &&
+            led_state_object.flag != 1) {
+            printk("Correct!\n");
+        }
+        else {
+            printk("Incorrect!\n");
+        }
+        smf_set_state(SMF_CTX(&led_state_object), &led_states[locked]);
+    }
+
+    if (led_state_object.index >= 4) {
+        led_state_object.flag = 1;
+    }
 
     return SMF_EVENT_HANDLED;
-}
-
-static void s3_state_exit(void* o) {
-    printk("Exiting S3\n");
-}
-
-static void s4_state_entry(void* o) {
-    LED_set(LED0, LED_ON);
-    LED_set(LED1, LED_ON);
-    LED_set(LED2, LED_ON);
-    LED_set(LED3, LED_ON);
-    printk("Entering S4\n");
-}
-
-static enum smf_state_result s4_state_run(void* o) {
-    if (BTN_check_clear_pressed(BTN3)) {
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[S0]);
-    }
-    else if (led_state_object.count > 63) {
-          LED_toggle(LED0);
-          LED_toggle(LED1);
-          LED_toggle(LED2);
-          LED_toggle(LED3);
-          led_state_object.count = 0;
-    }
-    else
-        led_state_object.count++;
-
-    return SMF_EVENT_HANDLED;
-}
-
-static void s4_state_exit(void* o) {
-    printk("Exiting S4\n");
 }

@@ -24,7 +24,10 @@ int main(void) {
     return 0;
   }
 
-  LED_set(LED0, LED_ON);
+  LED_set(LED0, LED_OFF);
+  LED_set(LED1, LED_OFF);
+  LED_set(LED2, LED_OFF);
+  LED_set(LED3, LED_OFF);
   state_machine_init();
 
   while(1) {
