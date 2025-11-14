@@ -50,6 +50,8 @@ typedef struct {
     uint8_t saved_char_index;
     char saved_string[10];
 
+    uint8_t state_before_standby;
+
 } mini_proj_state_object_t;
 
 
@@ -110,8 +112,10 @@ static void enter_ascii_entry(void* o) {
 
 static enum smf_state_result enter_ascii_run(void* o) {
 
-    if (BTN_0_1_held_for_3s()) 
+    if (BTN_0_1_held_for_3s()) {
+        mini_proj_state_object.state_before_standby = 1;
         smf_set_state(SMF_CTX(&mini_proj_states), &mini_proj_states[standby]);
+    }
     
     else if (BTN_check_clear_pressed(BTN0) && !BTN_check_clear_pressed(BTN1) && mini_proj_state_object.ascii_index >= 0) {
         mini_proj_state_object.current_char[mini_proj_state_object.ascii_index] = 0;
@@ -142,7 +146,7 @@ static enum smf_state_result enter_ascii_run(void* o) {
 
 }
 
-static void enter_ascii_entry(void* o) {
+static void saved_char_entry(void* o) {
 
     if (mini_proj_state_object.saved_char_index >= 10) {
         mini_proj_state_object.saved_char_index = 9; // Prevent overflow
@@ -160,8 +164,10 @@ static void enter_ascii_entry(void* o) {
 
 static enum smf_state_result saved_char_run(void* o) {
     
-    if (BTN_0_1_held_for_3s()) 
+    if (BTN_0_1_held_for_3s()) {
+        mini_proj_state_object.state_before_standby = 2;
         smf_set_state(SMF_CTX(&mini_proj_states), &mini_proj_states[standby]);
+    }
 
     else if (BTN_check_clear_pressed(BTN0) ^ BTN_check_clear_pressed(BTN1)) {
         // Move to the next character
@@ -198,8 +204,10 @@ static void saved_string_entry(void* o) {
 
 static enum smf_state_result saved_string_run(void* o) {
     
-    if (BTN_0_1_held_for_3s()) 
+    if (BTN_0_1_held_for_3s()) {
+        mini_proj_state_object.state_before_standby = 3;
         smf_set_state(SMF_CTX(&mini_proj_states), &mini_proj_states[standby]);
+    }
 
     else if (BTN_check_clear_pressed(BTN2)) {
         // Go back to enter ascii state
@@ -227,9 +235,33 @@ static void standby_entry(void* o) {
 }
 
 static enum smf_state_result standby_run(void* o) {
-    
-    
+    uint8_t current_duty_cycle = 0;
+    while (!BTN_check_clear_pressed(BTN0) 
+            || !BTN_check_clear_pressed(BTN1) 
+            || !BTN_check_clear_pressed(BTN2) 
+            || !BTN_check_clear_pressed(BTN3)) {
 
+        LED_pwm(LED0, current_duty_cycle);
+        LED_pwm(LED1, current_duty_cycle);
+        current_duty_cycle += 5;
+        if (current_duty_cycle > 100) {
+            current_duty_cycle = 0;
+        }
+        k_msleep(100);
+    }
+    // Restore previous state
+    if (mini_proj_state_object.state_before_standby == 1)
+    {
+        smf_set_state(SMF_CTX(&mini_proj_states), &mini_proj_states[enter_ascii]);
+    }
+    else if (mini_proj_state_object.state_before_standby == 2)
+    {
+        smf_set_state(SMF_CTX(&mini_proj_states), &mini_proj_states[saved_char]);
+    }
+    else // if (mini_proj_state_object.state_before_standby == 3)
+    {
+        smf_set_state(SMF_CTX(&mini_proj_states), &mini_proj_states[saved_string]);
+    }
     return SMF_EVENT_HANDLED;
 }
 
