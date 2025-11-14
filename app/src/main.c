@@ -3,12 +3,12 @@
  */
 
 #include <inttypes.h>
-
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 
 #include "BTN.h"
 #include "LED.h"
+#include "mini_proj_state_machine.h"
 
 #define SLEEP_MS 1
 
@@ -22,6 +22,7 @@ int main(void) {
   }
 
   while(1) {
+    state_machine_run();
     k_msleep(SLEEP_MS);
   }
 	return 0;
