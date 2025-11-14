@@ -110,9 +110,8 @@ static void enter_ascii_entry(void* o) {
 
 static enum smf_state_result enter_ascii_run(void* o) {
 
-    if (BTN_check_clear_pressed(BTN0) && BTN_check_clear_pressed(BTN1)) 
-        if BTN_0_1_held_for_3s() 
-            smf_set_state(SMF_CTX(&mini_proj_states), &mini_proj_states[standby]);
+    if (BTN_0_1_held_for_3s()) 
+        smf_set_state(SMF_CTX(&mini_proj_states), &mini_proj_states[standby]);
     
     else if (BTN_check_clear_pressed(BTN0) && !BTN_check_clear_pressed(BTN1) && mini_proj_state_object.ascii_index >= 0) {
         mini_proj_state_object.current_char[mini_proj_state_object.ascii_index] = 0;
@@ -161,9 +160,8 @@ static void enter_ascii_entry(void* o) {
 
 static enum smf_state_result saved_char_run(void* o) {
     
-    if (BTN_check_clear_pressed(BTN0) && BTN_check_clear_pressed(BTN1)) 
-        if BTN_0_1_held_for_3s() 
-            smf_set_state(SMF_CTX(&mini_proj_states), &mini_proj_states[standby]);
+    if (BTN_0_1_held_for_3s()) 
+        smf_set_state(SMF_CTX(&mini_proj_states), &mini_proj_states[standby]);
 
     else if (BTN_check_clear_pressed(BTN0) ^ BTN_check_clear_pressed(BTN1)) {
         // Move to the next character
@@ -195,9 +193,43 @@ static enum smf_state_result saved_char_run(void* o) {
 }
 
 static void saved_string_entry(void* o) {
-    prinktk("Saved String: %s\n", mini_proj_state_object.saved_string);
+    // No special entry actions needed
 }
 
-s
+static enum smf_state_result saved_string_run(void* o) {
+    
+    if (BTN_0_1_held_for_3s()) 
+        smf_set_state(SMF_CTX(&mini_proj_states), &mini_proj_states[standby]);
 
+    else if (BTN_check_clear_pressed(BTN2)) {
+        // Go back to enter ascii state
+        mini_proj_state_object.saved_char_index = 0;
+        mini_proj_state_object.saved_string[0] = '\0';
+        smf_set_state(SMF_CTX(&mini_proj_states), &mini_proj_states[enter_ascii]);
+    }
+    else if (BTN_check_clear_pressed(BTN3)) {
+        // Send to the serial monitor
+        printk("Saved String: %s\n", mini_proj_state_object.saved_string);
+    }
+
+    if (mini_proj_state_object.counter > 62.5) {
+        LED_toggle(LED3);
+        mini_proj_state_object.counter = 0;
+    } else {
+        mini_proj_state_object.counter++;
+    }
+
+    return SMF_EVENT_HANDLED;
+}
+
+static void standby_entry(void* o) {
+    LED_set(LED3, LED_OFF);
+}
+
+static enum smf_state_result standby_run(void* o) {
+    
+    
+
+    return SMF_EVENT_HANDLED;
+}
 
