@@ -10,6 +10,8 @@
 #include "LED.h"
 #include "mini_proj_state_machine.h"
 
+#include <math.h>
+
 #define SLEEP_MS 1
 
 int main(void) {
@@ -20,6 +22,8 @@ int main(void) {
   if (0 > LED_init()) {
     return 0;
   }
+
+  state_machine_init();
 
   while(1) {
     state_machine_run();
