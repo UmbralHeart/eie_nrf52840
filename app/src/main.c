@@ -20,6 +20,7 @@
 #include <zephyr/sys/printk.h>
 
 #include "LED.h"
+#include "BTN.h"
 
 /* MACROS --------------------------------------------------------------------------------------- */
 
@@ -126,7 +127,21 @@ static ssize_t ble_custom_service_write(struct bt_conn* conn, const struct bt_ga
 static void ble_custom_service_notify() {
   static uint32_t counter = 0;
   bt_gatt_notify(NULL, &ble_custom_service.attrs[2], &counter, sizeof(counter));
-  counter++;
+
+  static int8_t count_down = 0;
+  if (BTN_check_clear_pressed(BTN0)) {
+    printk("[BTN] BTN0 pressed, toggling count direction\n");
+    if (count_down == 0)
+      count_down = 1;
+    else
+      count_down = 0;
+  }
+
+  if (count_down) {
+    counter--;
+  } else {
+    counter++;
+  }
 }
 
 /* MAIN ----------------------------------------------------------------------------------------- */
@@ -150,6 +165,11 @@ int main(void) {
 
   if (0 > LED_init()) {
     printk("LED init failed\n");
+    return 0;
+  }
+
+  if (0 > BTN_init()) {
+    printk("BTN init failed\n");
     return 0;
   }
 
