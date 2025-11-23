@@ -44,4 +44,8 @@ int LED_pwm(led_id led, uint8_t duty_cycle);
 
 void LED_blink(led_id led, led_frequency frequency);
 
+// Returns the logical state of the given LED (LED_ON or LED_OFF).
+// On invalid LED id, returns LED_OFF.
+led_state LED_get(led_id led);
+
 #endif

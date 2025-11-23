@@ -86,7 +86,17 @@ static ssize_t ble_custom_service_read(struct bt_conn* conn, const struct bt_gat
                                        void* buf, uint16_t len, uint16_t offset) {
   // Send the data that is stored in the characteristic ("EiE" by default, can change if written to)
   // by fetching it directly from the characteristic object
+
   const char* data_to_send_to_connected_device = attr->user_data;
+
+  /* Query the LED driver for authoritative state instead of relying on a separate global. */
+  if (LED_get(LED1) == LED_OFF) {
+    printk("[BLE] ble_custom_service_read: LED is OFF\n");
+    data_to_send_to_connected_device = "LED OFF";
+  } else {
+    printk("[BLE] ble_custom_service_read: LED is ON\n");
+    data_to_send_to_connected_device = "LED ON";
+  }
 
   return bt_gatt_attr_read(conn, attr, buf, len, offset, data_to_send_to_connected_device,
                            strlen(data_to_send_to_connected_device));

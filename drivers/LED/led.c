@@ -241,3 +241,18 @@ void LED_blink(led_id led, led_frequency frequency) {
 
   _led_blink_thread.led_bitmask |= BIT(led);
 }
+
+/**
+ * @brief Get the logical state of the specified LED
+ *
+ * @param [in] led The LED instance to query
+ *
+ * @return LED_ON if duty cycle is non-zero, LED_OFF otherwise (or on invalid id)
+ */
+led_state LED_get(led_id led) {
+  if (IS_INVALID_LED(led)) {
+    return LED_OFF;
+  }
+
+  return (_leds[led]->current_duty_cycle == 0) ? LED_OFF : LED_ON;
+}
