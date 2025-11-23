@@ -19,6 +19,8 @@
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/printk.h>
 
+#include "LED.h"
+
 /* MACROS --------------------------------------------------------------------------------------- */
 
 #define BLE_CUSTOM_SERVICE_UUID \
@@ -107,6 +109,16 @@ static ssize_t ble_custom_service_write(struct bt_conn* conn, const struct bt_ga
     printk("%s %02X '%c'", i == 0 ? "" : ",", value[offset + i], value[offset + i]);
   }
   printk("\n");
+  
+  const char *led_on = "LED ON";
+  const char *led_off = "LED OFF";
+  if (memcmp(value + offset, led_on, strlen(led_on)) == 0) {
+    printk("[BLE] Turning LED ON\n");
+    LED_set(LED1, LED_ON);
+  } else if (memcmp(value + offset, led_off, strlen(led_off)) == 0) {
+    printk("[BLE] Turning LED OFF\n");
+    LED_set(LED1, LED_OFF);
+  }
 
   return len;
 }
@@ -136,9 +148,13 @@ int main(void) {
     return 0;
   }
 
+  if (0 > LED_init()) {
+    printk("LED init failed\n");
+    return 0;
+  }
+
   while (1) {
     k_sleep(K_MSEC(1000));
     ble_custom_service_notify();
-
   }
 }
