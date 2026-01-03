@@ -37,7 +37,7 @@ static const struct bt_data ble_advertising_data[] = {
 };
 
 static uint8_t ble_custom_characteristic_user_data[20] = {"Hello, World!"};
-static uint8_t ble_custom_characteristic_user_data_2[20] = {"Hello, World 2!"};
+static uint8_t ble_custom_characteristic_user_data_2[BLE_CUSTOM_CHARACTERISTIC_MAX_DATA_LENGTH + 1] = {0};
 
 static ssize_t ble_custom_characteristic_read_cb(struct bt_conn* conn, const struct bt_gatt_attr* attr,
                                                  void* buf, uint16_t len, uint16_t offset) {
@@ -58,6 +58,8 @@ static ssize_t ble_custom_characteristic_write_cb(struct bt_conn* conn, const st
   value_ptr[offset + len] = 0;
   printk("%s\n", value_ptr);
 
+  memcpy(ble_custom_characteristic_user_data, value_ptr, len+1);
+
   return len;
 }
 
@@ -70,13 +72,12 @@ static const struct bt_uuid_128 ble_custom_characteristic_uuid_2 = BT_UUID_INIT_
 BT_GATT_SERVICE_DEFINE(
     ble_custom_service,  // Name of the struct that will store the config for this service
     BT_GATT_PRIMARY_SERVICE(&ble_custom_service_uuid),  // Setting the service UUID
-
     BT_GATT_CHARACTERISTIC(
         &ble_custom_characteristic_uuid.uuid,  // Setting the characteristic UUID
-        BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,  // Possible operations
-        BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,  // Permissions that connecting devices have
+        BT_GATT_CHRC_READ,  // Possible operations
+        BT_GATT_PERM_READ,  // Permissions that connecting devices have
         ble_custom_characteristic_read_cb,     // Callback for when this characteristic is read from
-        ble_custom_characteristic_write_cb,    // Callback for when this characteristic is written to
+        NULL,                                   // No write callback for this characteristic
         ble_custom_characteristic_user_data    // Initial data stored in this characteristic
         ),
 );
@@ -86,9 +87,9 @@ BT_GATT_SERVICE_DEFINE(
     BT_GATT_PRIMARY_SERVICE(&ble_custom_service_uuid_2),  // Setting the service UUID
     BT_GATT_CHARACTERISTIC(
         &ble_custom_characteristic_uuid_2.uuid,  // Setting the characteristic UUID
-        BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,  // Possible operations
-        BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,  // Permissions that connecting devices have
-        ble_custom_characteristic_read_cb,     // Callback for when this characteristic is read from
+        BT_GATT_CHRC_WRITE,  // Possible operations
+        BT_GATT_PERM_WRITE,  // Permissions that connecting devices have
+        NULL,                                   // No read callback for this characteristic
         ble_custom_characteristic_write_cb,    // Callback for when this characteristic is written to
         ble_custom_characteristic_user_data_2    // Initial data stored in this characteristic
         ),
