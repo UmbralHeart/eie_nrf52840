@@ -21,15 +21,14 @@
 #include "BTN.h"
 #include "LED.h"
 
-#define SLEEP_MS 1
+#define SLEEP_MS 1000
 
 #define BLE_CUSTOM_CHARACTERISTIC_MAX_DATA_LENGTH 20
 
-#define BLE_CUSTOM_SERVICE_UUID BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef0)
-#define BLE_CUSTOM_CHARACTERISTIC_UUID BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef0)
-
-#define BLE_CUSTOM_SERVICE_2_UUID BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef0)
-#define BLE_CUSTOM_CHARACTERISTIC_2_UUID BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef0)
+#define BLE_CUSTOM_SERVICE_UUID          BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef0)
+#define BLE_CUSTOM_CHARACTERISTIC_UUID   BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef1)
+#define BLE_CUSTOM_SERVICE_2_UUID        BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef2)
+#define BLE_CUSTOM_CHARACTERISTIC_2_UUID BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef3)
 
 static const struct bt_data ble_advertising_data[] = {
   BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
@@ -102,7 +101,7 @@ BT_GATT_SERVICE_DEFINE(
 
 static void ble_custom_service_notify(void) {
   static uint32_t counter = 0;
-  bt_gatt_notify(NULL, &ble_custom_service.attrs[1], &counter, sizeof(counter));
+  bt_gatt_notify(NULL, &ble_custom_service.attrs[2], &counter, sizeof(counter));
   counter++;
 }
 
