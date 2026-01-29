@@ -138,12 +138,19 @@ int main(void) {
       printk("Touch at %u, %u\n", x_pos, y_pos);
 
       uint8_t column_data[] = {0, x_pos - 5, 0, x_pos + 5}; 
-      uint8_t row_data[] = {0, (-y_pos + 60) - 5, 0, (-y_pos + 60) + 5};    
+
+
+      uint8_t row_data[] = {0, (-y_pos + 60) - 5, 0, (-y_pos + 60) + 5}; 
+      if(y_pos < 60 && y_pos > 0) {
+        row_data[0] = 255;
+        row_data[2] = 255;    
+      }
+
       uint8_t color_data[300];
       for (int i = 0; i < 300; i += 3) {
-        color_data[i] = 0;     
-        color_data[i + 1] = 0; 
-        color_data[i + 2] = 0xFF;
+        color_data[i] = 0xFF;     
+        color_data[i + 1] = 0xFF; 
+        color_data[i + 2] = 0;
       }
       struct spi_buf column_data_buf = {column_data, 4};
       struct spi_buf row_data_buf = {row_data, 4};
