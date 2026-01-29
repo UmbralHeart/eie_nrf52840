@@ -45,63 +45,65 @@ typedef enum {
 } touch_event_t;
 
 #define ARDUINO_I2C_NODE DT_NODELABEL(arduino_i2c)
-static const struct device* dev = DEVICE_DT_GET(ARDUINO_I2C_NODE);
+static const struct device* devi2c = DEVICE_DT_GET(ARDUINO_I2C_NODE);
 
 void touch_control_cmd_rsp(uint8_t cmd, uint8_t * rsp) {
   struct i2c_msg cmd_rsp_msg[2] = {
     {&cmd, 1, I2C_MSG_WRITE},
     {rsp, 1, I2C_MSG_RESTART | I2C_MSG_READ | I2C_MSG_STOP}
   };
-  i2c_transfer(dev, cmd_rsp_msg, 2, ADDR);
+  i2c_transfer(devi2c, cmd_rsp_msg, 2, ADDR);
 }
 
+static const struct gpio_dt_spec dcx_gpio = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, dcx_gpios);
+static const struct spi_cs_control cs_ctrl = (struct spi_cs_control){
+  .gpio = GPIO_DT_SPEC_GET(ARDUINO_SPI_NODE, cs_gpios),
+  .delay = 1u,
+};
 
-// static const struct gpio_dt_spec dcx_gpio = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, dcx_gpios);
-// static const struct spi_cs_control cs_ctrl = (struct spi_cs_control){
-//   .gpio = GPIO_DT_SPEC_GET(ARDUINO_SPI_NODE, cs_gpios),
-//   .delay = 1u,
-// };
+static const struct device * devspi = DEVICE_DT_GET(ARDUINO_SPI_NODE);
+static const struct spi_config spi_cfg = {
+  .frequency = 1000000,
+  // SPI mode is not explicitly set in the operations bifield as we are using
+  // mode 0 which corresponds to a 0 value
+  .operation = SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB,
+  .slave = 0,
+  .cs = cs_ctrl,
+};
 
-// static const struct device * dev = DEVICE_DT_GET(ARDUINO_SPI_NODE);
-// static const struct spi_config spi_cfg = {
-//   .frequency = 1000000,
-//   // SPI mode is not explicitly set in the operations bifield as we are using
-//   // mode 0 which corresponds to a 0 value
-//   .operation = SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB,
-//   .slave = 0,
-//   .cs = cs_ctrl,
-// };
+static void lcd_cmd(uint8_t cmd, struct spi_buf * data) {
+  struct spi_buf cmd_buf[1] = {{&cmd, 1}};
+  struct spi_buf_set cmd_set = {cmd_buf, 1};
 
-// static void lcd_cmd(uint8_t cmd, struct spi_buf * data) {
-//   struct spi_buf cmd_buf[1] = {{&cmd, 1}};
-//   struct spi_buf_set cmd_set = {cmd_buf, 1};
+  // D/C select must be low to send command
+  gpio_pin_set_dt(&dcx_gpio, 0);
 
-//   // D/C select must be low to send command
-//   gpio_pin_set_dt(&dcx_gpio, 0);
-
-//   spi_write(dev, &spi_cfg, &cmd_set);
+  spi_write(devspi, &spi_cfg, &cmd_set);
   
-//   if (data != NULL) {
-//     struct spi_buf_set data_set = {data, 1};
+  if (data != NULL) {
+    struct spi_buf_set data_set = {data, 1};
 
-//     // D/C select must be high to send data
-//     gpio_pin_set_dt(&dcx_gpio, 1);
+    // D/C select must be high to send data
+    gpio_pin_set_dt(&dcx_gpio, 1);
 
-//     spi_write(dev, &spi_cfg, &data_set);
-//   }
-// }
+    spi_write(devspi, &spi_cfg, &data_set);
+  }
+}
 
 int main(void) {
-  if(!device_is_ready(dev)) {
+  if(!device_is_ready(devspi)) {
+    return 0;
+  }
+  if(!device_is_ready(devi2c)) {
     return 0;
   }
 
-  // if(!gpio_is_ready_dt(&dcx_gpio)) {
-  //   return 0;
-  // }
-  // if(gpio_pin_configure_dt(&dcx_gpio, GPIO_OUTPUT_LOW)) {
-  //   return 0;
-  // }
+  if(!gpio_is_ready_dt(&dcx_gpio)) {
+    return 0;
+  }
+  if(gpio_pin_configure_dt(&dcx_gpio, GPIO_OUTPUT_LOW)) {
+    return 0;
+  }
 
   if (0 > BTN_init()) {
     return 0;
@@ -110,26 +112,11 @@ int main(void) {
     return 0;
   }
 
-  // lcd_cmd(CMD_SOFTWARE_RESET, NULL);
-  // k_msleep(120);
-  // lcd_cmd(CMD_SLEEP_OUT, NULL);
-  // lcd_cmd(CMD_DISPLAY_ON, NULL);
+  lcd_cmd(CMD_SOFTWARE_RESET, NULL);
+  k_msleep(120);
+  lcd_cmd(CMD_SLEEP_OUT, NULL);
+  lcd_cmd(CMD_DISPLAY_ON, NULL);
 
-  // uint8_t column_data[] = {0x00, 0x95, 0x00, 0x9f}; // Column 149 to 159
-  // uint8_t row_data[] = {0x00, 0x75, 0x00, 0x7F};    // Row 117 to 127
-  // uint8_t color_data[300];
-  // for (int i = 0; i < 300; i += 3) {
-  //   color_data[i] = 0xFC;     
-  //   color_data[i + 1] = 0; 
-  //   color_data[i + 2] = 0;
-  // }
-  // struct spi_buf column_data_buf = {column_data, 4};
-  // struct spi_buf row_data_buf = {row_data, 4};
-  // struct spi_buf color_data_buf = {color_data, 300};
-
-  // lcd_cmd(CMD_COLUMN_ADDRESS_SET, &column_data_buf);
-  // lcd_cmd(CMD_ROW_ADDRESS_SET, &row_data_buf);
-  // lcd_cmd(CMD_MEMORY_WRITE, &color_data_buf);
   while(1) {
 
     uint8_t touch_status;
@@ -149,6 +136,23 @@ int main(void) {
       uint16_t y_pos = ((y_pos_h & TOUCH_POS_MSB_MASK) << 8) + y_pos_l;
 
       printk("Touch at %u, %u\n", x_pos, y_pos);
+
+      uint8_t column_data[] = {0, x_pos - 5, 0, x_pos + 5}; 
+      uint8_t row_data[] = {0, (-y_pos + 60) - 5, 0, (-y_pos + 60) + 5};    
+      uint8_t color_data[300];
+      for (int i = 0; i < 300; i += 3) {
+        color_data[i] = 0;     
+        color_data[i + 1] = 0; 
+        color_data[i + 2] = 0xFF;
+      }
+      struct spi_buf column_data_buf = {column_data, 4};
+      struct spi_buf row_data_buf = {row_data, 4};
+      struct spi_buf color_data_buf = {color_data, 300};
+
+      lcd_cmd(CMD_COLUMN_ADDRESS_SET, &column_data_buf);
+      lcd_cmd(CMD_ROW_ADDRESS_SET, &row_data_buf);
+      lcd_cmd(CMD_MEMORY_WRITE, &color_data_buf);
+
     }
     k_msleep(SLEEP_MS);
   }
