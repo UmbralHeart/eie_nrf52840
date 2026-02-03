@@ -1,107 +1,37 @@
-/*
- * main.c
+/**
+ * @file main.c
  */
 
 #include <inttypes.h>
 
 #include <zephyr/kernel.h>
-#include <zephyr/device.h>
-#include <zephyr/drivers/spi.h>
-#include <zephyr/drivers/gpio.h>
-#include <zephyr/drivers/i2c.h>
 #include <zephyr/sys/printk.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/display.h>
+
+#include <lvgl.h>
 
 #include "BTN.h"
 #include "LED.h"
+#include "lv_data_obj.h"
 
-#define ARDUINO_SPI_NODE DT_NODELABEL(arduino_spi)
-#define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
+#define SLEEP_MS 1
 
-#define CMD_SOFTWARE_RESET 0x01
-#define CMD_SLEEP_OUT 0x11
-#define CMD_DISPLAY_ON 0x29
-#define CMD_COLUMN_ADDRESS_SET 0x2A
-#define CMD_ROW_ADDRESS_SET 0x2B
-#define CMD_MEMORY_WRITE 0x2C
+static const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
+static lv_obj_t *screen = NULL;
 
-#define SLEEP_MS 100
-#define ADDR 0x38
-#define TD_STATUS 0x02
-#define P1_XH 0x03
-#define P1_XL 0x04
-#define P1_YH 0x05
-#define P1_YL 0x06
+void lv_button_callback(lv_event_t *event) {
+  lv_obj_t *data_obj = (lv_obj_t *)lv_event_get_user_data(event);
+  led_id led = *(led_id *)lv_data_obj_get_data_ptr(data_obj);
 
-#define TOUCH_EVENT_MASK 0xC0
-#define TOUCH_EVENT_SHIFT 6
-
-#define TOUCH_POS_MSB_MASK 0x0F
-
-typedef enum {
-  TOUCH_EVENT_PRESS_DOWN = 0b00u,
-  TOUCH_EVENT_LIFT_UP = 0b01u,
-  TOUCH_EVENT_CONTACT = 0b10u,
-  TOUCH_EVENT_NO_EVENT = 0b11u
-} touch_event_t;
-
-#define ARDUINO_I2C_NODE DT_NODELABEL(arduino_i2c)
-static const struct device* devi2c = DEVICE_DT_GET(ARDUINO_I2C_NODE);
-
-void touch_control_cmd_rsp(uint8_t cmd, uint8_t * rsp) {
-  struct i2c_msg cmd_rsp_msg[2] = {
-    {&cmd, 1, I2C_MSG_WRITE},
-    {rsp, 1, I2C_MSG_RESTART | I2C_MSG_READ | I2C_MSG_STOP}
-  };
-  i2c_transfer(devi2c, cmd_rsp_msg, 2, ADDR);
+  LED_toggle(led);
 }
-
-static const struct gpio_dt_spec dcx_gpio = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, dcx_gpios);
-static const struct spi_cs_control cs_ctrl = (struct spi_cs_control){
-  .gpio = GPIO_DT_SPEC_GET(ARDUINO_SPI_NODE, cs_gpios),
-  .delay = 1u,
-};
-
-static const struct device * devspi = DEVICE_DT_GET(ARDUINO_SPI_NODE);
-static const struct spi_config spi_cfg = {
-  .frequency = 1000000,
-  // SPI mode is not explicitly set in the operations bifield as we are using
-  // mode 0 which corresponds to a 0 value
-  .operation = SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB,
-  .slave = 0,
-  .cs = cs_ctrl,
-};
-
-static void lcd_cmd(uint8_t cmd, struct spi_buf * data) {
-  struct spi_buf cmd_buf[1] = {{&cmd, 1}};
-  struct spi_buf_set cmd_set = {cmd_buf, 1};
-
-  // D/C select must be low to send command
-  gpio_pin_set_dt(&dcx_gpio, 0);
-
-  spi_write(devspi, &spi_cfg, &cmd_set);
-  
-  if (data != NULL) {
-    struct spi_buf_set data_set = {data, 1};
-
-    // D/C select must be high to send data
-    gpio_pin_set_dt(&dcx_gpio, 1);
-
-    spi_write(devspi, &spi_cfg, &data_set);
-  }
-}
-
 int main(void) {
-  if(!device_is_ready(devspi)) {
+  if (!device_is_ready(display_dev)) {
     return 0;
   }
-  if(!device_is_ready(devi2c)) {
-    return 0;
-  }
-
-  if(!gpio_is_ready_dt(&dcx_gpio)) {
-    return 0;
-  }
-  if(gpio_pin_configure_dt(&dcx_gpio, GPIO_OUTPUT_LOW)) {
+  screen = lv_screen_active();
+  if (screen == NULL) {
     return 0;
   }
 
@@ -111,47 +41,27 @@ int main(void) {
   if (0 > LED_init()) {
     return 0;
   }
+  
+  for (uint8_t i = 0; i < NUM_LEDS; i++) {
+    lv_obj_t *ui_btn = lv_button_create(screen);
+    // place the buttons in a 2x2 grid in the center of the screen
+    // matching the orientations of the LEDs on the board
+    lv_obj_align(ui_btn, LV_ALIGN_CENTER, 50 * (i % 2 ? 1 : -1), 20 * (i < 2 ? -1 : 1));
+    lv_obj_t *button_label = lv_label_create(ui_btn);
+    char label_text[1];
+    snprintf(label_text, 10, "LED %d", i);
+    lv_label_set_text(button_label, label_text);
+    lv_obj_align(button_label, LV_ALIGN_CENTER, 0, 0);
 
-  lcd_cmd(CMD_SOFTWARE_RESET, NULL);
-  k_msleep(120);
-  lcd_cmd(CMD_SLEEP_OUT, NULL);
-  lcd_cmd(CMD_DISPLAY_ON, NULL);
-
-  uint8_t row_data[] = {0, 160 - 10, 0, 160 + 10}; 
-  uint8_t column_data[] = {0, 120 - 10, 0, 120 + 10};  
-  uint8_t color_data[300];
-  for (int i = 0; i < 300; i += 3) {
-    color_data[i] = 0xFF;     
-    color_data[i + 1] = 0; 
-    color_data[i + 2] = 0;
+    led_id led = (led_id)i;
+    lv_obj_t *data_obj = lv_data_obj_create_alloc_assign(ui_btn, &led, sizeof(led_id));
+    lv_obj_add_event_cb(ui_btn, lv_button_callback, LV_EVENT_CLICKED, data_obj);
   }
-  struct spi_buf column_data_buf = {column_data, 4};
-  struct spi_buf row_data_buf = {row_data, 4};
-  struct spi_buf color_data_buf = {color_data, 300};
 
-  lcd_cmd(CMD_COLUMN_ADDRESS_SET, &column_data_buf);
-  lcd_cmd(CMD_ROW_ADDRESS_SET, &row_data_buf);
-  lcd_cmd(CMD_MEMORY_WRITE, &color_data_buf);
-  while(1) {
-
-    uint8_t touch_status;
-    touch_control_cmd_rsp(TD_STATUS, &touch_status);
-    if(touch_status == 1) {
-      uint8_t x_pos_h;
-      uint8_t x_pos_l;
-      uint8_t y_pos_h;
-      uint8_t y_pos_l;
-
-      touch_control_cmd_rsp(P1_XH, &x_pos_h);
-      touch_control_cmd_rsp(P1_XL, &x_pos_l);
-      touch_control_cmd_rsp(P1_YH, &y_pos_h);
-      touch_control_cmd_rsp(P1_YL, &y_pos_l);
-
-      uint16_t x_pos = ((x_pos_h & TOUCH_POS_MSB_MASK) << 8) + x_pos_l;
-      uint16_t y_pos = ((y_pos_h & TOUCH_POS_MSB_MASK) << 8) + y_pos_l;
-      printk("Touch at %u, %u\n", x_pos, y_pos);
-    }
+  display_blanking_off(display_dev);
+  while (1) {
+    lv_timer_handler();
     k_msleep(SLEEP_MS);
   }
-	return 0;
+  return 0;
 }
