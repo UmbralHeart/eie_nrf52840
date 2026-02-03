@@ -117,8 +117,8 @@ int main(void) {
   lcd_cmd(CMD_SLEEP_OUT, NULL);
   lcd_cmd(CMD_DISPLAY_ON, NULL);
 
-  uint8_t row_data[] = {0, 10, 0, 239}; 
-  uint8_t column_data[] = {0, 10, 255, 64};  
+  uint8_t row_data[] = {0, 160 - 10, 0, 160 + 10}; 
+  uint8_t column_data[] = {0, 120 - 10, 0, 120 + 10};  
   uint8_t color_data[300];
   for (int i = 0; i < 300; i += 3) {
     color_data[i] = 0xFF;     
