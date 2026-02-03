@@ -117,39 +117,6 @@ int main(void) {
   lcd_cmd(CMD_SLEEP_OUT, NULL);
   lcd_cmd(CMD_DISPLAY_ON, NULL);
 
-  uint8_t column_data[] = {0, 0x05, 0, 0x78};  
-  uint8_t row_data[] = {0, 0x05, 0x00, 0xA0}; 
-  uint8_t color_data[300];
-  for (int i = 0; i < 300; i += 3) {
-    color_data[i] = 0x88;     
-    color_data[i + 1] = 0x88; 
-    color_data[i + 2] = 0x99;
-  }
-  struct spi_buf column_data_buf = {column_data, 4};
-  struct spi_buf row_data_buf = {row_data, 4};
-  struct spi_buf color_data_buf = {color_data, 300};
-
-  lcd_cmd(CMD_COLUMN_ADDRESS_SET, &column_data_buf);
-  lcd_cmd(CMD_ROW_ADDRESS_SET, &row_data_buf);
-  lcd_cmd(CMD_MEMORY_WRITE, &color_data_buf);
-
-  column_data[1] = 0x78;
-  row_data[1] = 0xA0;
-  column_data[3] = 0xF0;
-  row_data[3] = 0xEF;
-
-  for (int i = 0; i < 300; i += 3) {
-    color_data[i] = 0x88;     
-    color_data[i + 1] = 0x88; 
-    color_data[i + 2] = 0xAA;
-  }
-  struct spi_buf column2_data_buf = {column_data, 4};
-  struct spi_buf row2_data_buf = {row_data, 4};
-  struct spi_buf color2_data_buf = {color_data, 300};
-
-  lcd_cmd(CMD_COLUMN_ADDRESS_SET, &column2_data_buf);
-  lcd_cmd(CMD_ROW_ADDRESS_SET, &row2_data_buf);
-  lcd_cmd(CMD_MEMORY_WRITE, &color2_data_buf);
   while(1) {
 
     uint8_t touch_status;
@@ -169,7 +136,28 @@ int main(void) {
       uint16_t y_pos = ((y_pos_h & TOUCH_POS_MSB_MASK) << 8) + y_pos_l;
 
       printk("Touch at %u, %u\n", x_pos, y_pos);
+      y_pos = 319 - y_pos;
+      uint8_t row_data[] = {0, x_pos - 5, 0, x_pos + 5}; 
+      uint8_t column_data[] = {0, y_pos - 5, 0, y_pos + 5};  
+      if (y_pos > 255) {
+        column_data[0] = 255;
+        column_data[1] = y_pos - 5 - 255;
+        column_data[2] = 255;
+        column_data[3] = y_pos + 5 - 255;
+      }
+      uint8_t color_data[300];
+      for (int i = 0; i < 300; i += 3) {
+        color_data[i] = 0x00;     
+        color_data[i + 1] = 0x00; 
+        color_data[i + 2] = 0xFF;
+      }
+      struct spi_buf column_data_buf = {column_data, 4};
+      struct spi_buf row_data_buf = {row_data, 4};
+      struct spi_buf color_data_buf = {color_data, 300};
 
+      lcd_cmd(CMD_COLUMN_ADDRESS_SET, &column_data_buf);
+      lcd_cmd(CMD_ROW_ADDRESS_SET, &row_data_buf);
+      lcd_cmd(CMD_MEMORY_WRITE, &color_data_buf);
     }
     k_msleep(SLEEP_MS);
   }
